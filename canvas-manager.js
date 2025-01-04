@@ -23,12 +23,14 @@ class Shape {
             ctx.strokeRect(this.x, this.y, this.width, this.height);
         } else if (this.type === 'circle') {
             ctx.beginPath();
-            ctx.arc(
-                this.x + this.width/2,
-                this.y + this.height/2,
-                Math.min(this.width, this.height)/2,
-                0,
-                Math.PI * 2
+            ctx.ellipse(
+                this.x + this.width/2,   // center x
+                this.y + this.height/2,   // center y
+                this.width/2,            // radius x
+                this.height/2,           // radius y
+                0,                       // rotation
+                0,                       // start angle
+                Math.PI * 2              // end angle
             );
             ctx.fill();
             ctx.stroke();
@@ -89,10 +91,12 @@ class Shape {
             ctx.strokeRect(this.x, this.y, this.width, this.height);
         } else if (this.type === 'circle') {
             ctx.beginPath();
-            ctx.arc(
+            ctx.ellipse(
                 this.x + this.width/2,
                 this.y + this.height/2,
-                Math.min(this.width, this.height)/2,
+                this.width/2,
+                this.height/2,
+                0,
                 0,
                 Math.PI * 2
             );
@@ -108,10 +112,11 @@ class Shape {
         } else if (this.type === 'circle') {
             const cx = this.x + this.width/2;
             const cy = this.y + this.height/2;
-            const radius = Math.min(this.width, this.height)/2;
+            const rx = this.width/2;
+            const ry = this.height/2;
             const dx = px - cx;
             const dy = py - cy;
-            return (dx * dx + dy * dy) <= (radius * radius);
+            return (dx * dx)/(rx * rx) + (dy * dy)/(ry * ry) <= 1;
         }
         return false;
     }
@@ -131,22 +136,98 @@ class Shape {
         } else if (this.type === 'circle') {
             const cx = this.x + this.width/2;
             const cy = this.y + this.height/2;
-            const radius = Math.min(this.width, this.height)/2;
 
-            // Check if circle center is in box
+            // Check if ellipse center is in box
             if (cx >= boxLeft && cx <= boxRight && 
                 cy >= boxTop && cy <= boxBottom) {
                 return true;
             }
 
-            // Check distance to closest point on box
+            // Check distance to closest point on box using elliptical distance
             const closestX = Math.max(boxLeft, Math.min(cx, boxRight));
             const closestY = Math.max(boxTop, Math.min(cy, boxBottom));
             const dx = cx - closestX;
             const dy = cy - closestY;
-            return (dx * dx + dy * dy) <= (radius * radius);
+            
+            // Use normalized ellipse equation
+            return (dx * dx)/(this.width * this.width/4) + 
+                   (dy * dy)/(this.height * this.height/4) <= 1;
         }
         return false;
+    }
+
+    // Get the handle at the given point (if any)
+    getHandle(px, py) {
+        if (!this.isSelected || this.selectionType !== 'direct') return null;
+
+        const corners = [
+            { x: this.x, y: this.y, cursor: 'nw-resize', handle: 'top-left' },
+            { x: this.x + this.width, y: this.y, cursor: 'ne-resize', handle: 'top-right' },
+            { x: this.x + this.width, y: this.y + this.height, cursor: 'se-resize', handle: 'bottom-right' },
+            { x: this.x, y: this.y + this.height, cursor: 'sw-resize', handle: 'bottom-left' }
+        ];
+
+        for (const corner of corners) {
+            if (px >= corner.x - this.handleSize/2 && 
+                px <= corner.x + this.handleSize/2 &&
+                py >= corner.y - this.handleSize/2 && 
+                py <= corner.y + this.handleSize/2) {
+                return corner;
+            }
+        }
+        return null;
+    }
+
+    // Resize the shape based on handle movement
+    resize(handle, dx, dy) {
+        const MIN_SIZE = 20; // Minimum dimension size
+        
+        switch (handle) {
+            case 'top-left':
+                const newX = this.x + dx;
+                const newY = this.y + dy;
+                const newWidth = this.width - dx;
+                const newHeight = this.height - dy;
+                
+                if (newWidth > MIN_SIZE) {
+                    this.x = newX;
+                    this.width = newWidth;
+                }
+                if (newHeight > MIN_SIZE) {
+                    this.y = newY;
+                    this.height = newHeight;
+                }
+                break;
+
+            case 'top-right':
+                if (this.width + dx > MIN_SIZE) {
+                    this.width += dx;
+                }
+                if (this.height - dy > MIN_SIZE) {
+                    this.y += dy;
+                    this.height -= dy;
+                }
+                break;
+
+            case 'bottom-right':
+                if (this.width + dx > MIN_SIZE) {
+                    this.width += dx;
+                }
+                if (this.height + dy > MIN_SIZE) {
+                    this.height += dy;
+                }
+                break;
+
+            case 'bottom-left':
+                if (this.width - dx > MIN_SIZE) {
+                    this.x += dx;
+                    this.width -= dx;
+                }
+                if (this.height + dy > MIN_SIZE) {
+                    this.height += dy;
+                }
+                break;
+        }
     }
 }
 
@@ -161,6 +242,8 @@ class CanvasManager {
         this.selectedShapes = [];
         this.isSelecting = false;
         this.isDragging = false;
+        this.isResizing = false;
+        this.activeHandle = null;
         this.selectionStart = { x: 0, y: 0 };
         this.selectionCurrent = { x: 0, y: 0 };
         this.lastMousePos = { x: 0, y: 0 };
@@ -187,6 +270,19 @@ class CanvasManager {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
+
+        // Check for handle interaction first
+        if (this.selectedShapes.length === 1) {
+            const shape = this.selectedShapes[0];
+            const handle = shape.getHandle(x, y);
+            
+            if (handle) {
+                this.isResizing = true;
+                this.activeHandle = handle;
+                this.canvas.style.cursor = handle.cursor;
+                return;
+            }
+        }
 
         const clickedShape = this.shapes.find(shape => shape.containsPoint(x, y));
 
@@ -245,7 +341,18 @@ class CanvasManager {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        if (this.isSelecting) {
+        // Update cursor based on handle hover
+        if (this.selectedShapes.length === 1 && !this.isResizing && !this.isDragging) {
+            const shape = this.selectedShapes[0];
+            const handle = shape.getHandle(x, y);
+            this.canvas.style.cursor = handle ? handle.cursor : 'default';
+        }
+
+        if (this.isResizing && this.activeHandle) {
+            const dx = x - this.lastMousePos.x;
+            const dy = y - this.lastMousePos.y;
+            this.selectedShapes[0].resize(this.activeHandle.handle, dx, dy);
+        } else if (this.isSelecting) {
             this.selectionCurrent = { x, y };
             this.updateBoxSelection();
         } else if (this.isDragging) {
@@ -262,6 +369,9 @@ class CanvasManager {
     handleMouseUp() {
         this.isSelecting = false;
         this.isDragging = false;
+        this.isResizing = false;
+        this.activeHandle = null;
+        this.canvas.style.cursor = 'default';
         this.draw();
     }
 
