@@ -1,4 +1,4 @@
-// Shape class definition for managing individual shapes
+// Shape class for managing individual shapes
 class Shape {
     constructor(type, x, y, width, height, color) {
         this.type = type;    // 'rect' or 'circle'
@@ -8,27 +8,98 @@ class Shape {
         this.height = height;
         this.color = color;
         this.isSelected = false;
+        this.selectionType = null; // 'direct' or 'box'
+        this.handleSize = 8; // Size of resize handles
     }
 
-    // Draw the shape with selection highlighting if selected
+    // Draw the shape
     draw(ctx) {
         ctx.fillStyle = this.isSelected ? `${this.color}99` : this.color;
-        ctx.strokeStyle = this.isSelected ? '#ff0000' : '#000000';
-        ctx.lineWidth = this.isSelected ? 2 : 1;
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
 
         if (this.type === 'rect') {
             ctx.fillRect(this.x, this.y, this.width, this.height);
             ctx.strokeRect(this.x, this.y, this.width, this.height);
         } else if (this.type === 'circle') {
             ctx.beginPath();
-            ctx.arc(
+            ctx.ellipse(
+                this.x + this.width/2,   // center x
+                this.y + this.height/2,   // center y
+                this.width/2,            // radius x
+                this.height/2,           // radius y
+                0,                       // rotation
+                0,                       // start angle
+                Math.PI * 2              // end angle
+            );
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // Draw selection visuals if selected
+        if (this.isSelected) {
+            if (this.selectionType === 'direct') {
+                this.drawDirectSelection(ctx);
+            } else {
+                this.drawBoxSelection(ctx);
+            }
+        }
+    }
+
+    // Draw selection visuals for direct click selection
+    drawDirectSelection(ctx) {
+        // Draw bounding box
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+        // Draw resize handles
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 1;
+
+        // Corner handles
+        const corners = [
+            { x: this.x, y: this.y },                           // Top-left
+            { x: this.x + this.width, y: this.y },             // Top-right
+            { x: this.x + this.width, y: this.y + this.height }, // Bottom-right
+            { x: this.x, y: this.y + this.height }             // Bottom-left
+        ];
+
+        corners.forEach(corner => {
+            ctx.fillRect(
+                corner.x - this.handleSize/2,
+                corner.y - this.handleSize/2,
+                this.handleSize,
+                this.handleSize
+            );
+            ctx.strokeRect(
+                corner.x - this.handleSize/2,
+                corner.y - this.handleSize/2,
+                this.handleSize,
+                this.handleSize
+            );
+        });
+    }
+
+    // Draw selection visuals for box selection
+    drawBoxSelection(ctx) {
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 2;
+        
+        if (this.type === 'rect') {
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+        } else if (this.type === 'circle') {
+            ctx.beginPath();
+            ctx.ellipse(
                 this.x + this.width/2,
                 this.y + this.height/2,
-                Math.min(this.width, this.height)/2,
+                this.width/2,
+                this.height/2,
+                0,
                 0,
                 Math.PI * 2
             );
-            ctx.fill();
             ctx.stroke();
         }
     }
@@ -41,10 +112,11 @@ class Shape {
         } else if (this.type === 'circle') {
             const cx = this.x + this.width/2;
             const cy = this.y + this.height/2;
-            const radius = Math.min(this.width, this.height)/2;
+            const rx = this.width/2;
+            const ry = this.height/2;
             const dx = px - cx;
             const dy = py - cy;
-            return (dx * dx + dy * dy) <= (radius * radius);
+            return (dx * dx)/(rx * rx) + (dy * dy)/(ry * ry) <= 1;
         }
         return false;
     }
@@ -64,26 +136,102 @@ class Shape {
         } else if (this.type === 'circle') {
             const cx = this.x + this.width/2;
             const cy = this.y + this.height/2;
-            const radius = Math.min(this.width, this.height)/2;
 
-            // Check if circle center is in box
+            // Check if ellipse center is in box
             if (cx >= boxLeft && cx <= boxRight && 
                 cy >= boxTop && cy <= boxBottom) {
                 return true;
             }
 
-            // Check distance to closest point on box
+            // Check distance to closest point on box using elliptical distance
             const closestX = Math.max(boxLeft, Math.min(cx, boxRight));
             const closestY = Math.max(boxTop, Math.min(cy, boxBottom));
             const dx = cx - closestX;
             const dy = cy - closestY;
-            return (dx * dx + dy * dy) <= (radius * radius);
+            
+            // Use normalized ellipse equation
+            return (dx * dx)/(this.width * this.width/4) + 
+                   (dy * dy)/(this.height * this.height/4) <= 1;
         }
         return false;
     }
+
+    // Get the handle at the given point (if any)
+    getHandle(px, py) {
+        if (!this.isSelected || this.selectionType !== 'direct') return null;
+
+        const corners = [
+            { x: this.x, y: this.y, cursor: 'nw-resize', handle: 'top-left' },
+            { x: this.x + this.width, y: this.y, cursor: 'ne-resize', handle: 'top-right' },
+            { x: this.x + this.width, y: this.y + this.height, cursor: 'se-resize', handle: 'bottom-right' },
+            { x: this.x, y: this.y + this.height, cursor: 'sw-resize', handle: 'bottom-left' }
+        ];
+
+        for (const corner of corners) {
+            if (px >= corner.x - this.handleSize/2 && 
+                px <= corner.x + this.handleSize/2 &&
+                py >= corner.y - this.handleSize/2 && 
+                py <= corner.y + this.handleSize/2) {
+                return corner;
+            }
+        }
+        return null;
+    }
+
+    // Resize the shape based on handle movement
+    resize(handle, dx, dy) {
+        const MIN_SIZE = 20; // Minimum dimension size
+        
+        switch (handle) {
+            case 'top-left':
+                const newX = this.x + dx;
+                const newY = this.y + dy;
+                const newWidth = this.width - dx;
+                const newHeight = this.height - dy;
+                
+                if (newWidth > MIN_SIZE) {
+                    this.x = newX;
+                    this.width = newWidth;
+                }
+                if (newHeight > MIN_SIZE) {
+                    this.y = newY;
+                    this.height = newHeight;
+                }
+                break;
+
+            case 'top-right':
+                if (this.width + dx > MIN_SIZE) {
+                    this.width += dx;
+                }
+                if (this.height - dy > MIN_SIZE) {
+                    this.y += dy;
+                    this.height -= dy;
+                }
+                break;
+
+            case 'bottom-right':
+                if (this.width + dx > MIN_SIZE) {
+                    this.width += dx;
+                }
+                if (this.height + dy > MIN_SIZE) {
+                    this.height += dy;
+                }
+                break;
+
+            case 'bottom-left':
+                if (this.width - dx > MIN_SIZE) {
+                    this.x += dx;
+                    this.width -= dx;
+                }
+                if (this.height + dy > MIN_SIZE) {
+                    this.height += dy;
+                }
+                break;
+        }
+    }
 }
 
-// CanvasManager class to handle all canvas operations
+// Canvas Manager class
 class CanvasManager {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -94,10 +242,11 @@ class CanvasManager {
         this.selectedShapes = [];
         this.isSelecting = false;
         this.isDragging = false;
+        this.isResizing = false;
+        this.activeHandle = null;
         this.selectionStart = { x: 0, y: 0 };
         this.selectionCurrent = { x: 0, y: 0 };
         this.lastMousePos = { x: 0, y: 0 };
-        this._lastKeyEvent = null; // Track shift key state
 
         // Bind event handlers
         this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -108,56 +257,72 @@ class CanvasManager {
         this.setupEventListeners();
     }
 
-    // Initialize event listeners
+    // Set up event listeners
     setupEventListeners() {
         this.canvas.addEventListener('mousedown', this.handleMouseDown);
         this.canvas.addEventListener('mousemove', this.handleMouseMove);
         this.canvas.addEventListener('mouseup', this.handleMouseUp);
         this.canvas.addEventListener('mouseleave', this.handleMouseUp);
-        
-        // Track shift key state
-        window.addEventListener('keydown', (e) => this._lastKeyEvent = e);
-        window.addEventListener('keyup', (e) => this._lastKeyEvent = e);
     }
 
-    // Add a new shape to the canvas
-    addShape(type, x, y, width, height, color) {
-        const shape = new Shape(type, x, y, width, height, color);
-        this.shapes.push(shape);
-        this.draw();
-    }
-
-    // Clear all shapes from the canvas
-    clearShapes() {
-        this.shapes = [];
-        this.selectedShapes = [];
-        this.draw();
-    }
-
-    // Handle mouse down events for both click-selection and drag-selection
+    // Handle mouse down event
     handleMouseDown(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // Check if we clicked on any shape
+        // Check for handle interaction first
+        if (this.selectedShapes.length === 1) {
+            const shape = this.selectedShapes[0];
+            const handle = shape.getHandle(x, y);
+            
+            if (handle) {
+                this.isResizing = true;
+                this.activeHandle = handle;
+                this.canvas.style.cursor = handle.cursor;
+                return;
+            }
+        }
+
         const clickedShape = this.shapes.find(shape => shape.containsPoint(x, y));
 
         if (clickedShape) {
-            // If we clicked a shape
             if (e.shiftKey) {
-                // Shift-click: Toggle selection of clicked shape
-                this.toggleShapeSelection(clickedShape);
-            } else {
-                // Regular click: Select only this shape unless it's already selected
-                if (!clickedShape.isSelected) {
-                    this.clearSelection();
-                    this.addToSelection(clickedShape);
+                // Shift-click behavior
+                if (clickedShape.isSelected) {
+                    // Remove from selection
+                    clickedShape.isSelected = false;
+                    clickedShape.selectionType = null;
+                    const index = this.selectedShapes.indexOf(clickedShape);
+                    if (index > -1) {
+                        this.selectedShapes.splice(index, 1);
+                    }
+                } else {
+                    // Add to selection
+                    clickedShape.isSelected = true;
+                    clickedShape.selectionType = this.selectedShapes.length === 0 ? 'direct' : 'box';
+                    this.selectedShapes.push(clickedShape);
                 }
-                this.isDragging = true;
+            } else {
+                // Regular click
+                if (!clickedShape.isSelected) {
+                    // If clicking an unselected shape, clear others and select this one
+                    this.clearSelection();
+                    clickedShape.isSelected = true;
+                    clickedShape.selectionType = 'direct';
+                    this.selectedShapes.push(clickedShape);
+                } else if (this.selectedShapes.length === 1) {
+                    // If clicking the only selected shape, maintain direct selection
+                    clickedShape.selectionType = 'direct';
+                } else {
+                    // If clicking a shape that's part of a group selection,
+                    // maintain the group selection
+                    // Don't change anything about the selection
+                }
             }
+            this.isDragging = true;
         } else {
-            // Clicked empty space
+            // Start box selection
             if (!e.shiftKey) {
                 this.clearSelection();
             }
@@ -170,15 +335,26 @@ class CanvasManager {
         this.draw();
     }
 
-    // Handle mouse movement for both dragging and selection box
+    // Handle mouse move event
     handleMouseMove(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        if (this.isSelecting) {
+        // Update cursor based on handle hover
+        if (this.selectedShapes.length === 1 && !this.isResizing && !this.isDragging) {
+            const shape = this.selectedShapes[0];
+            const handle = shape.getHandle(x, y);
+            this.canvas.style.cursor = handle ? handle.cursor : 'default';
+        }
+
+        if (this.isResizing && this.activeHandle) {
+            const dx = x - this.lastMousePos.x;
+            const dy = y - this.lastMousePos.y;
+            this.selectedShapes[0].resize(this.activeHandle.handle, dx, dy);
+        } else if (this.isSelecting) {
             this.selectionCurrent = { x, y };
-            this.updateSelectionBox();
+            this.updateBoxSelection();
         } else if (this.isDragging) {
             const dx = x - this.lastMousePos.x;
             const dy = y - this.lastMousePos.y;
@@ -189,84 +365,61 @@ class CanvasManager {
         this.draw();
     }
 
-    // Handle mouse up events
+    // Handle mouse up event
     handleMouseUp() {
         this.isSelecting = false;
         this.isDragging = false;
+        this.isResizing = false;
+        this.activeHandle = null;
+        this.canvas.style.cursor = 'default';
         this.draw();
     }
 
-    // Toggle selection state of a shape
-    toggleShapeSelection(shape) {
-        if (shape.isSelected) {
-            shape.isSelected = false;
-            const index = this.selectedShapes.indexOf(shape);
-            if (index > -1) {
-                this.selectedShapes.splice(index, 1);
-            }
-        } else {
-            shape.isSelected = true;
-            this.selectedShapes.push(shape);
-        }
-    }
-
-    // Add a shape to the selection
-    addToSelection(shape) {
-        if (!shape.isSelected) {
-            shape.isSelected = true;
-            this.selectedShapes.push(shape);
-        }
-    }
-
-    // Clear all selections
-    clearSelection() {
-        this.selectedShapes.forEach(shape => shape.isSelected = false);
-        this.selectedShapes = [];
-    }
-
-    // Remove a shape from selection
-    removeFromSelection(shape) {
-        if (shape.isSelected) {
-            shape.isSelected = false;
-            const index = this.selectedShapes.indexOf(shape);
-            if (index > -1) {
-                this.selectedShapes.splice(index, 1);
-            }
-        }
-    }
-
     // Update shapes within selection box
-    updateSelectionBox() {
-        // When not holding shift, we'll manage a temporary selection set
-        // that updates continuously as the selection box moves
-        if (!this._lastKeyEvent?.shiftKey) {
-            // First, clear any existing selection
-            this.clearSelection();
-        }
-
-        // Check each shape against the current selection box
+    updateBoxSelection() {
         this.shapes.forEach(shape => {
-            const intersects = shape.intersectsBox(
+            if (shape.intersectsBox(
                 this.selectionStart.x, this.selectionStart.y,
                 this.selectionCurrent.x, this.selectionCurrent.y
-            );
-
-            if (intersects) {
-                // Add to selection if intersecting
-                this.addToSelection(shape);
-            } else if (!this._lastKeyEvent?.shiftKey) {
-                // Remove from selection if not intersecting and not using shift
-                this.removeFromSelection(shape);
+            )) {
+                if (!shape.isSelected) {
+                    shape.isSelected = true;
+                    shape.selectionType = 'box';
+                    this.selectedShapes.push(shape);
+                }
+            } else if (shape.selectionType === 'box') {
+                shape.isSelected = false;
+                shape.selectionType = null;
+                const index = this.selectedShapes.indexOf(shape);
+                if (index > -1) {
+                    this.selectedShapes.splice(index, 1);
+                }
             }
         });
     }
 
-    // Move all selected shapes
+    // Move selected shapes
     moveSelectedShapes(dx, dy) {
         this.selectedShapes.forEach(shape => {
             shape.x += dx;
             shape.y += dy;
         });
+    }
+
+    // Clear all selections
+    clearSelection() {
+        this.selectedShapes.forEach(shape => {
+            shape.isSelected = false;
+            shape.selectionType = null;
+        });
+        this.selectedShapes = [];
+    }
+
+    // Add a new shape
+    addShape(type, x, y, width, height, color) {
+        const shape = new Shape(type, x, y, width, height, color);
+        this.shapes.push(shape);
+        this.draw();
     }
 
     // Main draw function
@@ -293,5 +446,4 @@ class CanvasManager {
     }
 }
 
-// Export the classes for use in other files
 export { Shape, CanvasManager };
