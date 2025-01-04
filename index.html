@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Selection Demo</title>
+    <style>
+        canvas {
+            border: 1px solid #000;
+        }
+        .instructions {
+            margin: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            max-width: 800px;
+        }
+        .controls {
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">
+        <h2>Enhanced Canvas Selection Demo</h2>
+        <p><strong>Selection Methods:</strong></p>
+        <ul>
+            <li>Click and drag to create a selection box</li>
+            <li>Click directly on a shape to select it</li>
+            <li>Hold Shift and click to add/remove individual shapes from selection</li>
+            <li>Click and drag selected shapes to move them as a group</li>
+            <li>Click empty space to clear selection</li>
+        </ul>
+    </div>
+    
+    <div class="controls">
+        <button onclick="addRandomShape()">Add Random Shape</button>
+        <button onclick="clearCanvas()">Clear Canvas</button>
+    </div>
+
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <script type="module">
+        import { CanvasManager } from './canvas-manager.js';
+
+        // Initialize the canvas manager
+        const manager = new CanvasManager('canvas');
+
+        // Add some initial shapes
+        function addInitialShapes() {
+            manager.addShape('rect', 50, 50, 60, 60, '#4CAF50');
+            manager.addShape('circle', 200, 100, 80, 80, '#2196F3');
+            manager.addShape('rect', 400, 200, 100, 60, '#FFC107');
+            manager.addShape('circle', 600, 400, 70, 70, '#9C27B0');
+            manager.addShape('rect', 100, 300, 80, 80, '#FF5722');
+        }
+
+        // Add a random shape
+        window.addRandomShape = function() {
+            const types = ['rect', 'circle'];
+            const colors = ['#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#FF5722'];
+            
+            const type = types[Math.floor(Math.random() * types.length)];
+            const x = Math.random() * (canvas.width - 100);
+            const y = Math.random() * (canvas.height - 100);
+            const size = 40 + Math.random() * 60;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            manager.addShape(type, x, y, size, size, color);
+        }
+
+        // Clear all shapes
+        window.clearCanvas = function() {
+            manager.clearShapes();
+        }
+
+        // Initialize the demo
+        addInitialShapes();
+    </script>
+</body>
+</html>
