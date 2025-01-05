@@ -53,11 +53,12 @@
             manager.addShape('rect', 400, 200, 100, 60, '#FFC107');
             manager.addShape('circle', 600, 400, 70, 70, '#9C27B0');
             manager.addShape('rect', 100, 300, 80, 80, '#FF5722');
+            manager.addShape('arrow', 100, 400, 50, 60, '#000000');
         }
 
         // Add a random shape
         window.addRandomShape = function() {
-            const types = ['rect', 'circle'];
+            const types = ['rect', 'circle', 'arrow'];
             const colors = ['#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#FF5722'];
             
             const type = types[Math.floor(Math.random() * types.length)];
