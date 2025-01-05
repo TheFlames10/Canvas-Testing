@@ -10,15 +10,23 @@ class Shape {
         this.isSelected = false;
         this.selectionType = null; // 'direct' or 'box'
         this.handleSize = 8; // Size of resize handles
+
+        if (type === 'arrow') {
+            this.startPoint = { x: this.x, y: this.y };
+            this.endPoint = { x: this.x + width, y: this.y + height };
+            this.arrowHeadSize = 15; // Size of arrow head
+        }
     }
 
     // Draw the shape
     draw(ctx) {
         ctx.fillStyle = this.isSelected ? `${this.color}99` : this.color;
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = this.isSelected ? `${this.color}99` : this.color;
+        ctx.lineWidth = 2;
 
-        if (this.type === 'rect') {
+        if (this.type === 'arrow') {
+            this.drawArrow(ctx);
+        } else if (this.type === 'rect') {
             ctx.fillRect(this.x, this.y, this.width, this.height);
             ctx.strokeRect(this.x, this.y, this.width, this.height);
         } else if (this.type === 'circle') {
@@ -46,40 +54,85 @@ class Shape {
         }
     }
 
+    drawArrow(ctx) {
+        const dx = this.endPoint.x - this.startPoint.x;
+        const dy = this.endPoint.y - this.startPoint.y;
+        const angle = Math.atan2(dy, dx);
+        
+        // Draw arrow shaft
+        ctx.beginPath();
+        ctx.moveTo(this.startPoint.x, this.startPoint.y);
+        ctx.lineTo(this.endPoint.x, this.endPoint.y);
+        ctx.stroke();
+
+        // Draw arrow head
+        ctx.beginPath();
+        ctx.moveTo(this.endPoint.x, this.endPoint.y);
+        ctx.lineTo(
+            this.endPoint.x - this.arrowHeadSize * Math.cos(angle - Math.PI / 6),
+            this.endPoint.y - this.arrowHeadSize * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.lineTo(
+            this.endPoint.x - this.arrowHeadSize * Math.cos(angle + Math.PI / 6),
+            this.endPoint.y - this.arrowHeadSize * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.closePath();
+        ctx.fill();
+    }
+
     // Draw selection visuals for direct click selection
     drawDirectSelection(ctx) {
-        // Draw bounding box
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        if (this.type === 'arrow') {
+            // Draw endpoint handles
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 1;
 
-        // Draw resize handles
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 1;
+            // Start point handle
+            ctx.beginPath();
+            ctx.arc(this.startPoint.x, this.startPoint.y, this.handleSize/2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
 
-        // Corner handles
-        const corners = [
-            { x: this.x, y: this.y },                           // Top-left
-            { x: this.x + this.width, y: this.y },             // Top-right
-            { x: this.x + this.width, y: this.y + this.height }, // Bottom-right
-            { x: this.x, y: this.y + this.height }             // Bottom-left
-        ];
+            // End point handle
+            ctx.beginPath();
+            ctx.arc(this.endPoint.x, this.endPoint.y, this.handleSize/2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            // Draw bounding box
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
 
-        corners.forEach(corner => {
-            ctx.fillRect(
-                corner.x - this.handleSize/2,
-                corner.y - this.handleSize/2,
-                this.handleSize,
-                this.handleSize
-            );
-            ctx.strokeRect(
-                corner.x - this.handleSize/2,
-                corner.y - this.handleSize/2,
-                this.handleSize,
-                this.handleSize
-            );
-        });
+            // Draw resize handles
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 1;
+
+            // Corner handles
+            const corners = [
+                { x: this.x, y: this.y },                           // Top-left
+                { x: this.x + this.width, y: this.y },             // Top-right
+                { x: this.x + this.width, y: this.y + this.height }, // Bottom-right
+                { x: this.x, y: this.y + this.height }             // Bottom-left
+            ];
+
+            corners.forEach(corner => {
+                ctx.fillRect(
+                    corner.x - this.handleSize/2,
+                    corner.y - this.handleSize/2,
+                    this.handleSize,
+                    this.handleSize
+                );
+                ctx.strokeRect(
+                    corner.x - this.handleSize/2,
+                    corner.y - this.handleSize/2,
+                    this.handleSize,
+                    this.handleSize
+                );
+            });
+        }
     }
 
     // Draw selection visuals for box selection
@@ -87,7 +140,30 @@ class Shape {
         ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 2;
         
-        if (this.type === 'rect') {
+        if (this.type === 'arrow') {
+            // Just highlight the arrow shaft and head
+            const dx = this.endPoint.x - this.startPoint.x;
+            const dy = this.endPoint.y - this.startPoint.y;
+            const angle = Math.atan2(dy, dx);
+            
+            ctx.beginPath();
+            ctx.moveTo(this.startPoint.x, this.startPoint.y);
+            ctx.lineTo(this.endPoint.x, this.endPoint.y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(this.endPoint.x, this.endPoint.y);
+            ctx.lineTo(
+                this.endPoint.x - this.arrowHeadSize * Math.cos(angle - Math.PI / 6),
+                this.endPoint.y - this.arrowHeadSize * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.lineTo(
+                this.endPoint.x - this.arrowHeadSize * Math.cos(angle + Math.PI / 6),
+                this.endPoint.y - this.arrowHeadSize * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.stroke();
+        } else if (this.type === 'rect') {
             ctx.strokeRect(this.x, this.y, this.width, this.height);
         } else if (this.type === 'circle') {
             ctx.beginPath();
@@ -106,7 +182,36 @@ class Shape {
 
     // Check if a point is inside the shape
     containsPoint(px, py) {
-        if (this.type === 'rect') {
+        if (this.type === 'arrow') {
+            // Check if point is near the arrow shaft
+            const tolerance = 5; // Distance threshold for shaft selection
+            
+            // Calculate distance from point to line segment (arrow shaft)
+            const dx = this.endPoint.x - this.startPoint.x;
+            const dy = this.endPoint.y - this.startPoint.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            // Normalize direction vector
+            const dirX = dx / length;
+            const dirY = dy / length;
+            
+            // Vector from start point to test point
+            const vpx = px - this.startPoint.x;
+            const vpy = py - this.startPoint.y;
+            
+            // Project test point onto line
+            const proj = vpx * dirX + vpy * dirY;
+            
+            // Check if projection is within line segment
+            if (proj < 0 || proj > length) return false;
+            
+            // Calculate distance from point to line
+            const projX = this.startPoint.x + proj * dirX;
+            const projY = this.startPoint.y + proj * dirY;
+            const distSq = (px - projX) * (px - projX) + (py - projY) * (py - projY);
+            
+            return distSq <= tolerance * tolerance;
+        } else if (this.type === 'rect') {
             return px >= this.x && px <= this.x + this.width &&
                    py >= this.y && py <= this.y + this.height;
         } else if (this.type === 'circle') {
@@ -128,7 +233,34 @@ class Shape {
         const boxTop = Math.min(y1, y2);
         const boxBottom = Math.max(y1, y2);
 
-        if (this.type === 'rect') {
+        if (this.type === 'arrow') {
+            // First check if either endpoint is inside the box
+            if ((this.startPoint.x >= boxLeft && this.startPoint.x <= boxRight &&
+                 this.startPoint.y >= boxTop && this.startPoint.y <= boxBottom) ||
+                (this.endPoint.x >= boxLeft && this.endPoint.x <= boxRight &&
+                 this.endPoint.y >= boxTop && this.endPoint.y <= boxBottom)) {
+                return true;
+            }
+
+            // Then check for line segment intersection with all four sides of the box
+            const boxSides = [
+                // Format: [x1, y1, x2, y2] for each line segment
+                [boxLeft, boxTop, boxRight, boxTop],       // Top edge
+                [boxRight, boxTop, boxRight, boxBottom],   // Right edge
+                [boxRight, boxBottom, boxLeft, boxBottom], // Bottom edge
+                [boxLeft, boxBottom, boxLeft, boxTop]      // Left edge
+            ];
+
+            // Check intersection with each side of the box
+            return boxSides.some(([sideX1, sideY1, sideX2, sideY2]) => 
+                this.lineSegmentsIntersect(
+                    this.startPoint.x, this.startPoint.y,
+                    this.endPoint.x, this.endPoint.y,
+                    sideX1, sideY1,
+                    sideX2, sideY2
+                )
+            );
+        } else if (this.type === 'rect') {
             return !(this.x + this.width < boxLeft || 
                     this.x > boxRight ||
                     this.y + this.height < boxTop || 
@@ -156,77 +288,137 @@ class Shape {
         return false;
     }
 
+    // Helper method to check if two line segments intersect
+    lineSegmentsIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+        // Calculate vectors for the two line segments
+        const dx1 = x2 - x1;
+        const dy1 = y2 - y1;
+        const dx2 = x4 - x3;
+        const dy2 = y4 - y3;
+
+        // Calculate the determinant to check if lines are parallel
+        const determinant = dx1 * dy2 - dy1 * dx2;
+        
+        // If determinant is 0, lines are parallel and can't intersect
+        if (Math.abs(determinant) < 1e-10) return false;
+
+        // Calculate the parameters for the intersection point
+        const t1 = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / determinant;
+        const t2 = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / determinant;
+
+        // Check if intersection point lies within both line segments
+        return t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1;
+    }
+
     // Get the handle at the given point (if any)
     getHandle(px, py) {
         if (!this.isSelected || this.selectionType !== 'direct') return null;
 
-        const corners = [
-            { x: this.x, y: this.y, cursor: 'nw-resize', handle: 'top-left' },
-            { x: this.x + this.width, y: this.y, cursor: 'ne-resize', handle: 'top-right' },
-            { x: this.x + this.width, y: this.y + this.height, cursor: 'se-resize', handle: 'bottom-right' },
-            { x: this.x, y: this.y + this.height, cursor: 'sw-resize', handle: 'bottom-left' }
-        ];
-
-        for (const corner of corners) {
-            if (px >= corner.x - this.handleSize/2 && 
-                px <= corner.x + this.handleSize/2 &&
-                py >= corner.y - this.handleSize/2 && 
-                py <= corner.y + this.handleSize/2) {
-                return corner;
+        if (this.type === 'arrow') {
+            // Check start point handle
+            const startDist = Math.sqrt(
+                (px - this.startPoint.x) * (px - this.startPoint.x) +
+                (py - this.startPoint.y) * (py - this.startPoint.y)
+            );
+            if (startDist <= this.handleSize/2) {
+                return { x: this.startPoint.x, y: this.startPoint.y, cursor: 'move', handle: 'start' };
             }
+
+            // Check end point handle
+            const endDist = Math.sqrt(
+                (px - this.endPoint.x) * (px - this.endPoint.x) +
+                (py - this.endPoint.y) * (py - this.endPoint.y)
+            );
+            if (endDist <= this.handleSize/2) {
+                return { x: this.endPoint.x, y: this.endPoint.y, cursor: 'move', handle: 'end' };
+            }
+
+            return null;
+        } else {
+            const corners = [
+                { x: this.x, y: this.y, cursor: 'nw-resize', handle: 'top-left' },
+                { x: this.x + this.width, y: this.y, cursor: 'ne-resize', handle: 'top-right' },
+                { x: this.x + this.width, y: this.y + this.height, cursor: 'se-resize', handle: 'bottom-right' },
+                { x: this.x, y: this.y + this.height, cursor: 'sw-resize', handle: 'bottom-left' }
+            ];
+    
+            for (const corner of corners) {
+                if (px >= corner.x - this.handleSize/2 && 
+                    px <= corner.x + this.handleSize/2 &&
+                    py >= corner.y - this.handleSize/2 && 
+                    py <= corner.y + this.handleSize/2) {
+                    return corner;
+                }
+            }
+            return null;
         }
-        return null;
     }
 
     // Resize the shape based on handle movement
     resize(handle, dx, dy) {
-        const MIN_SIZE = 20; // Minimum dimension size
+        if (this.type === 'arrow') {
+            if (handle === 'start') {
+                this.startPoint.x += dx;
+                this.startPoint.y += dy;
+                this.x = this.startPoint.x;
+                this.y = this.startPoint.y;
+            } else if (handle === 'end') {
+                this.endPoint.x += dx;
+                this.endPoint.y += dy;
+            }
+            
+            // Update width and height based on new points
+            this.width = this.endPoint.x - this.startPoint.x;
+            this.height = this.endPoint.y - this.startPoint.y;
+        } else {
+            const MIN_SIZE = 20; // Minimum dimension size
         
-        switch (handle) {
-            case 'top-left':
-                const newX = this.x + dx;
-                const newY = this.y + dy;
-                const newWidth = this.width - dx;
-                const newHeight = this.height - dy;
-                
-                if (newWidth > MIN_SIZE) {
-                    this.x = newX;
-                    this.width = newWidth;
-                }
-                if (newHeight > MIN_SIZE) {
-                    this.y = newY;
-                    this.height = newHeight;
-                }
-                break;
+            switch (handle) {
+                case 'top-left':
+                    const newX = this.x + dx;
+                    const newY = this.y + dy;
+                    const newWidth = this.width - dx;
+                    const newHeight = this.height - dy;
+                    
+                    if (newWidth > MIN_SIZE) {
+                        this.x = newX;
+                        this.width = newWidth;
+                    }
+                    if (newHeight > MIN_SIZE) {
+                        this.y = newY;
+                        this.height = newHeight;
+                    }
+                    break;
 
-            case 'top-right':
-                if (this.width + dx > MIN_SIZE) {
-                    this.width += dx;
-                }
-                if (this.height - dy > MIN_SIZE) {
-                    this.y += dy;
-                    this.height -= dy;
-                }
-                break;
+                case 'top-right':
+                    if (this.width + dx > MIN_SIZE) {
+                        this.width += dx;
+                    }
+                    if (this.height - dy > MIN_SIZE) {
+                        this.y += dy;
+                        this.height -= dy;
+                    }
+                    break;
 
-            case 'bottom-right':
-                if (this.width + dx > MIN_SIZE) {
-                    this.width += dx;
-                }
-                if (this.height + dy > MIN_SIZE) {
-                    this.height += dy;
-                }
-                break;
+                case 'bottom-right':
+                    if (this.width + dx > MIN_SIZE) {
+                        this.width += dx;
+                    }
+                    if (this.height + dy > MIN_SIZE) {
+                        this.height += dy;
+                    }
+                    break;
 
-            case 'bottom-left':
-                if (this.width - dx > MIN_SIZE) {
-                    this.x += dx;
-                    this.width -= dx;
-                }
-                if (this.height + dy > MIN_SIZE) {
-                    this.height += dy;
-                }
-                break;
+                case 'bottom-left':
+                    if (this.width - dx > MIN_SIZE) {
+                        this.x += dx;
+                        this.width -= dx;
+                    }
+                    if (this.height + dy > MIN_SIZE) {
+                        this.height += dy;
+                    }
+                    break;
+            }
         }
     }
 }
@@ -401,8 +593,25 @@ class CanvasManager {
     // Move selected shapes
     moveSelectedShapes(dx, dy) {
         this.selectedShapes.forEach(shape => {
-            shape.x += dx;
-            shape.y += dy;
+            if (shape.type === 'arrow') {
+                // For arrows, move both endpoints and update base coordinates
+                shape.startPoint.x += dx;
+                shape.startPoint.y += dy;
+                shape.endPoint.x += dx;
+                shape.endPoint.y += dy;
+                
+                // Update base coordinates to match new position
+                shape.x = shape.startPoint.x;
+                shape.y = shape.startPoint.y;
+                
+                // Update width and height to maintain arrow dimensions
+                shape.width = shape.endPoint.x - shape.startPoint.x;
+                shape.height = shape.endPoint.y - shape.startPoint.y;
+            } else {
+                // For other shapes, simply update position
+                shape.x += dx;
+                shape.y += dy;
+            }
         });
     }
 
